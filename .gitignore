@@ -1,7 +1,8 @@
 # 配置文件（包含敏感信息）
 config.js
-export-data.js
-backup.json
+
+# 本地备份文件
+/backup.json
 # 系统文件
 .DS_Store
 *.log
