@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎾 网球小组赛计分系统</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎾</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a1628;
+      --bg-card: #132337;
+      --accent: #4ade80;
+      --accent-dim: #22c55e;
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --court-green: #2d5a27;
+      --court-line: #ffffff;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(ellipse at top, #1a3a2f 0%, transparent 50%),
+        radial-gradient(ellipse at bottom right, #1e3a5f 0%, transparent 50%);
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    header {
+      text-align: center;
+      padding: 40px 20px;
+      border-bottom: 1px solid rgba(74, 222, 128, 0.2);
+      margin-bottom: 40px;
+    }
+    
+    header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #4ade80, #22d3ee);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+    
+    header p {
+      color: var(--text-dim);
+      font-size: 1.1rem;
+    }
+    
+    .setup-notice {
+      background: linear-gradient(135deg, #f59e0b20, #ef444420);
+      border: 1px solid var(--warning);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    
+    .setup-notice h3 {
+      color: var(--warning);
+      margin-bottom: 10px;
+    }
+    
+    .setup-notice code {
+      background: #00000040;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+    
+    .tab {
+      padding: 12px 24px;
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: inherit;
+      color: var(--text-dim);
+      font-size: 1rem;
+    }
+    
+    .tab:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+    
+    .tab.active {
+      background: var(--accent);
+      color: var(--bg-dark);
+      font-weight: 600;
+      border-color: var(--accent);
+    }
+    
+    .panel {
+      display: none;
+    }
+    
+    .panel.active {
+      display: block;
+    }
+    
+    .card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .card h2 {
+      font-size: 1.3rem;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .form-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+    
+    input, select {
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.3);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 1rem;
+      flex: 1;
+      min-width: 120px;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    
+    select option {
+      background: var(--bg-dark);
+    }
+    
+    button {
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      color: var(--bg-dark);
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    button:hover {
+      background: var(--accent-dim);
+      transform: translateY(-2px);
+    }
+    
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    
+    button.danger {
+      background: var(--danger);
+      color: white;
+    }
+    
+    button.small {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+    }
+    
+    /* Rankings Table */
+    .rankings-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .rankings-table th,
+    .rankings-table td {
+      padding: 16px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .rankings-table th {
+      color: var(--text-dim);
+      font-weight: 500;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .rankings-table tr:hover {
+      background: rgba(74, 222, 128, 0.05);
+    }
+    
+    .rank {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    
+    .rank-1 { color: #ffd700; }
+    .rank-2 { color: #c0c0c0; }
+    .rank-3 { color: #cd7f32; }
+    
+    .player-name {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    
+    .stat {
+      color: var(--text-dim);
+    }
+    
+    .stat.positive {
+      color: var(--accent);
+    }
+    
+    .stat.negative {
+      color: var(--danger);
+    }
+    
+    /* Players List */
+    .players-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+    }
+    
+    .player-card {
+      background: rgba(0,0,0,0.2);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .player-card span {
+      font-weight: 500;
+    }
+    
+    /* Matches List */
+    .match-card {
+      background: rgba(0,0,0,0.2);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 15px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .match-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .match-players {
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    
+    .match-players .winner {
+      color: var(--accent);
+    }
+    
+    .match-date {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+    
+    .match-sets {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .set-score {
+      background: var(--bg-card);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+    }
+    
+    .set-score.won {
+      background: rgba(74, 222, 128, 0.2);
+      color: var(--accent);
+    }
+    
+    /* Match Form */
+    .set-inputs {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin: 15px 0;
+    }
+    
+    .set-input-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .set-input-group label {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+    
+    .set-input-group input {
+      width: 60px;
+      text-align: center;
+    }
+    
+    .vs {
+      color: var(--text-dim);
+    }
+    
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+    }
+    
+    .empty-state span {
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 15px;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 1.8rem;
+      }
+      
+      .rankings-table th,
+      .rankings-table td {
+        padding: 12px 8px;
+        font-size: 0.9rem;
+      }
+      
+      .rank {
+        font-size: 1.2rem;
+      }
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-dim);
+    }
+
+    .error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--danger);
+      border-radius: 12px;
+      padding: 20px;
+      color: var(--danger);
+      margin-bottom: 20px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .badge.qualified {
+      background: rgba(74, 222, 128, 0.2);
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎾 网球小组赛计分系统</h1>
+      <p>Round Robin Tournament Tracker</p>
+    </header>
+
+    <div id="setup-notice" class="setup-notice" style="display: none;">
+      <h3>⚠️ 需要配置 Supabase</h3>
+      <p>请在页面底部的 JavaScript 中填入你的 Supabase URL 和 Key</p>
+      <p style="margin-top: 10px;">
+        <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code>
+      </p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="rankings">📊 排名</button>
+      <button class="tab" data-tab="matches">🏆 比赛记录</button>
+      <button class="tab" data-tab="add-match">➕ 添加比赛</button>
+      <button class="tab" data-tab="players">👥 选手管理</button>
+    </div>
+
+    <!-- Rankings Panel -->
+    <div id="rankings" class="panel active">
+      <div class="card">
+        <h2>📊 当前排名</h2>
+        <div id="rankings-content">
+          <div class="loading">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matches Panel -->
+    <div id="matches" class="panel">
+      <div class="card">
+        <h2>🏆 比赛记录</h2>
+        <div id="matches-content">
+          <div class="loading">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Match Panel -->
+    <div id="add-match" class="panel">
+      <div class="card">
+        <h2>➕ 添加比赛结果</h2>
+        <form id="match-form">
+          <div class="form-row">
+            <select id="player1" required>
+              <option value="">选择选手 1</option>
+            </select>
+            <span class="vs" style="align-self: center;">VS</span>
+            <select id="player2" required>
+              <option value="">选择选手 2</option>
+            </select>
+          </div>
+          
+          <p style="color: var(--text-dim); margin-bottom: 15px;">每盘比分（三盘两胜，第三盘为 10 分抢十）</p>
+          
+          <div class="set-inputs">
+            <div class="set-input-group">
+              <label>第一盘</label>
+              <input type="number" id="set1-p1" min="0" max="7" placeholder="0" required>
+              <span class="vs">:</span>
+              <input type="number" id="set1-p2" min="0" max="7" placeholder="0" required>
+            </div>
+            <div class="set-input-group">
+              <label>第二盘</label>
+              <input type="number" id="set2-p1" min="0" max="7" placeholder="0" required>
+              <span class="vs">:</span>
+              <input type="number" id="set2-p2" min="0" max="7" placeholder="0" required>
+            </div>
+            <div class="set-input-group">
+              <label>第三盘 (抢十)</label>
+              <input type="number" id="set3-p1" min="0" max="15" placeholder="-">
+              <span class="vs">:</span>
+              <input type="number" id="set3-p2" min="0" max="15" placeholder="-">
+            </div>
+          </div>
+          
+          <button type="submit">保存比赛结果</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Players Panel -->
+    <div id="players" class="panel">
+      <div class="card">
+        <h2>👥 选手管理</h2>
+        <form id="player-form" class="form-row">
+          <input type="text" id="player-name" placeholder="输入选手名字" required>
+          <button type="submit">添加选手</button>
+        </form>
+        <div id="players-list" class="players-grid" style="margin-top: 20px;">
+          <div class="loading">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 配置文件（不上传到 GitHub） -->
+  <script src="config.js"></script>
+  <script>
+    let db;
+    let players = [];
+    let matches = [];
+
+    // 初始化
+    async function init() {
+      if (typeof CONFIG === 'undefined' || !CONFIG.SUPABASE_URL || CONFIG.SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+        document.getElementById('setup-notice').style.display = 'block';
+        return;
+      }
+
+      db = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+      
+      await loadData();
+      setupEventListeners();
+    }
+
+    // 加载数据
+    async function loadData() {
+      try {
+        const [playersRes, matchesRes] = await Promise.all([
+          db.from('players').select('*').order('name'),
+          db.from('matches').select('*').order('created_at', { ascending: false })
+        ]);
+
+        if (playersRes.error) throw playersRes.error;
+        if (matchesRes.error) throw matchesRes.error;
+
+        players = playersRes.data || [];
+        matches = matchesRes.data || [];
+
+        renderAll();
+      } catch (error) {
+        console.error('加载数据失败:', error);
+        showError('加载数据失败: ' + error.message);
+      }
+    }
+
+    // 渲染所有内容
+    function renderAll() {
+      renderRankings();
+      renderMatches();
+      renderPlayers();
+      updatePlayerSelects();
+    }
+
+    // 计算排名
+    function calculateRankings() {
+      const stats = {};
+
+      // 初始化统计
+      players.forEach(p => {
+        stats[p.id] = {
+          id: p.id,
+          name: p.name,
+          points: 0,
+          wins: 0,
+          losses: 0,
+          setsWon: 0,
+          setsLost: 0,
+          gamesWon: 0,
+          gamesLost: 0,
+          headToHead: {}
+        };
+      });
+
+      // 统计比赛数据
+      matches.forEach(match => {
+        const p1 = stats[match.player1_id];
+        const p2 = stats[match.player2_id];
+        if (!p1 || !p2) return;
+
+        const sets = match.sets;
+        let p1Sets = 0, p2Sets = 0;
+        let p1Games = 0, p2Games = 0;
+
+        sets.forEach((set, idx) => {
+          if (set[0] === null || set[1] === null) return;
+          
+          p1Games += set[0];
+          p2Games += set[1];
+
+          // 判断这盘谁赢
+          if (idx === 2) {
+            // 第三盘抢十
+            if (set[0] >= 10 && set[0] > set[1]) p1Sets++;
+            else if (set[1] >= 10 && set[1] > set[0]) p2Sets++;
+          } else {
+            // 普通盘
+            if (set[0] > set[1]) p1Sets++;
+            else if (set[1] > set[0]) p2Sets++;
+          }
+        });
+
+        // 更新统计
+        p1.setsWon += p1Sets;
+        p1.setsLost += p2Sets;
+        p2.setsWon += p2Sets;
+        p2.setsLost += p1Sets;
+        p1.gamesWon += p1Games;
+        p1.gamesLost += p2Games;
+        p2.gamesWon += p2Games;
+        p2.gamesLost += p1Games;
+
+        // 记分规则
+        if (p1Sets > p2Sets) {
+          p1.points += 2;
+          p1.wins++;
+          p2.points += p2Sets; // 负者得分等于赢的盘数
+          p2.losses++;
+          p1.headToHead[match.player2_id] = 'win';
+          p2.headToHead[match.player1_id] = 'loss';
+        } else {
+          p2.points += 2;
+          p2.wins++;
+          p1.points += p1Sets;
+          p1.losses++;
+          p2.headToHead[match.player1_id] = 'win';
+          p1.headToHead[match.player2_id] = 'loss';
+        }
+      });
+
+      // 排序
+      const rankings = Object.values(stats).sort((a, b) => {
+        // 1. 先按积分排序
+        if (b.points !== a.points) return b.points - a.points;
+        
+        // 2. 两人积分相同，看对战记录
+        if (a.headToHead[b.id] === 'win') return -1;
+        if (a.headToHead[b.id] === 'loss') return 1;
+        
+        // 3. 三人及以上相同，看盘分差
+        const aSetDiff = a.setsWon - a.setsLost;
+        const bSetDiff = b.setsWon - b.setsLost;
+        if (bSetDiff !== aSetDiff) return bSetDiff - aSetDiff;
+        
+        // 4. 再看局分差
+        const aGameDiff = a.gamesWon - a.gamesLost;
+        const bGameDiff = b.gamesWon - b.gamesLost;
+        return bGameDiff - aGameDiff;
+      });
+
+      return rankings;
+    }
+
+    // 渲染排名
+    function renderRankings() {
+      const container = document.getElementById('rankings-content');
+      const rankings = calculateRankings();
+
+      if (rankings.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <span>🎾</span>
+            <p>还没有选手，请先添加选手</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <table class="rankings-table">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>选手</th>
+              <th>积分</th>
+              <th>胜/负</th>
+              <th>盘分</th>
+              <th>局分</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      rankings.forEach((player, index) => {
+        const rank = index + 1;
+        const setDiff = player.setsWon - player.setsLost;
+        const gameDiff = player.gamesWon - player.gamesLost;
+
+        html += `
+          <tr>
+            <td><span class="rank rank-${rank}">${rank}</span></td>
+            <td>
+              <span class="player-name">${player.name}</span>
+            </td>
+            <td><strong>${player.points}</strong></td>
+            <td>${player.wins}胜 ${player.losses}负</td>
+            <td>
+              <span class="stat ${setDiff > 0 ? 'positive' : setDiff < 0 ? 'negative' : ''}">
+                ${player.setsWon}-${player.setsLost} (${setDiff >= 0 ? '+' : ''}${setDiff})
+              </span>
+            </td>
+            <td>
+              <span class="stat ${gameDiff > 0 ? 'positive' : gameDiff < 0 ? 'negative' : ''}">
+                ${player.gamesWon}-${player.gamesLost} (${gameDiff >= 0 ? '+' : ''}${gameDiff})
+              </span>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // 渲染比赛列表
+    function renderMatches() {
+      const container = document.getElementById('matches-content');
+
+      if (matches.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <span>🏆</span>
+            <p>还没有比赛记录</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      matches.forEach(match => {
+        const p1 = players.find(p => p.id === match.player1_id);
+        const p2 = players.find(p => p.id === match.player2_id);
+        if (!p1 || !p2) return;
+
+        // 计算谁赢
+        let p1Sets = 0, p2Sets = 0;
+        match.sets.forEach((set, idx) => {
+          if (set[0] === null || set[1] === null) return;
+          if (idx === 2) {
+            if (set[0] >= 10 && set[0] > set[1]) p1Sets++;
+            else if (set[1] >= 10 && set[1] > set[0]) p2Sets++;
+          } else {
+            if (set[0] > set[1]) p1Sets++;
+            else if (set[1] > set[0]) p2Sets++;
+          }
+        });
+
+        const p1Won = p1Sets > p2Sets;
+        const date = new Date(match.created_at).toLocaleDateString('zh-CN');
+
+        html += `
+          <div class="match-card">
+            <div class="match-header">
+              <div class="match-players">
+                <span class="${p1Won ? 'winner' : ''}">${p1.name}</span>
+                <span style="color: var(--text-dim);"> vs </span>
+                <span class="${!p1Won ? 'winner' : ''}">${p2.name}</span>
+              </div>
+              <div>
+                <span class="match-date">${date}</span>
+                <button class="small danger" onclick="deleteMatch(${match.id})" style="margin-left: 10px;">删除</button>
+              </div>
+            </div>
+            <div class="match-sets">
+              ${match.sets.map((set, idx) => {
+                if (set[0] === null && set[1] === null) return '';
+                const p1WonSet = idx === 2 
+                  ? (set[0] >= 10 && set[0] > set[1])
+                  : (set[0] > set[1]);
+                return `
+                  <div class="set-score ${p1WonSet ? 'won' : ''}">
+                    第${idx + 1}盘: ${set[0]} - ${set[1]}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // 渲染选手列表
+    function renderPlayers() {
+      const container = document.getElementById('players-list');
+
+      if (players.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <span>👥</span>
+            <p>还没有选手</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = players.map(p => `
+        <div class="player-card">
+          <span>${p.name}</span>
+          <button class="small danger" onclick="deletePlayer(${p.id})">删除</button>
+        </div>
+      `).join('');
+    }
+
+    // 更新选手下拉框
+    function updatePlayerSelects() {
+      const options = '<option value="">选择选手</option>' + 
+        players.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      
+      document.getElementById('player1').innerHTML = options;
+      document.getElementById('player2').innerHTML = options;
+    }
+
+    // 添加选手
+    async function addPlayer(name) {
+      try {
+        const { data, error } = await db
+          .from('players')
+          .insert([{ name }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        players.push(data);
+        renderAll();
+      } catch (error) {
+        alert('添加失败: ' + error.message);
+      }
+    }
+
+    // 删除选手
+    async function deletePlayer(id) {
+      if (!confirm('确定删除这个选手吗？相关比赛也会被删除')) return;
+
+      try {
+        // 先删除相关比赛
+        await db
+          .from('matches')
+          .delete()
+          .or(`player1_id.eq.${id},player2_id.eq.${id}`);
+
+        // 再删除选手
+        const { error } = await db
+          .from('players')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        
+        await loadData();
+      } catch (error) {
+        alert('删除失败: ' + error.message);
+      }
+    }
+
+    // 添加比赛
+    async function addMatch(player1Id, player2Id, sets) {
+      try {
+        // 检查是否已经比过赛
+        const existing = matches.find(m => 
+          (m.player1_id === player1Id && m.player2_id === player2Id) ||
+          (m.player1_id === player2Id && m.player2_id === player1Id)
+        );
+
+        if (existing) {
+          alert('这两位选手已经比过赛了！');
+          return;
+        }
+
+        const { data, error } = await db
+          .from('matches')
+          .insert([{
+            player1_id: player1Id,
+            player2_id: player2Id,
+            sets: sets
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        matches.unshift(data);
+        renderAll();
+        alert('比赛结果已保存！');
+        
+        // 切换到排名页
+        switchTab('rankings');
+      } catch (error) {
+        alert('保存失败: ' + error.message);
+      }
+    }
+
+    // 删除比赛
+    async function deleteMatch(id) {
+      if (!confirm('确定删除这场比赛记录吗？')) return;
+
+      try {
+        const { error } = await db
+          .from('matches')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        
+        await loadData();
+      } catch (error) {
+        alert('删除失败: ' + error.message);
+      }
+    }
+
+    // 切换标签页
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      
+      document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // 显示错误
+    function showError(msg) {
+      const container = document.getElementById('rankings-content');
+      container.innerHTML = `<div class="error">${msg}</div>`;
+    }
+
+    // 事件监听
+    function setupEventListeners() {
+      // 标签切换
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+      });
+
+      // 添加选手
+      document.getElementById('player-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('player-name');
+        const name = input.value.trim();
+        if (name) {
+          await addPlayer(name);
+          input.value = '';
+        }
+      });
+
+      // 添加比赛
+      document.getElementById('match-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const player1Id = parseInt(document.getElementById('player1').value);
+        const player2Id = parseInt(document.getElementById('player2').value);
+        
+        if (player1Id === player2Id) {
+          alert('请选择不同的选手！');
+          return;
+        }
+
+        const set1 = [
+          parseInt(document.getElementById('set1-p1').value),
+          parseInt(document.getElementById('set1-p2').value)
+        ];
+        const set2 = [
+          parseInt(document.getElementById('set2-p1').value),
+          parseInt(document.getElementById('set2-p2').value)
+        ];
+        const set3p1 = document.getElementById('set3-p1').value;
+        const set3p2 = document.getElementById('set3-p2').value;
+        const set3 = set3p1 !== '' && set3p2 !== '' 
+          ? [parseInt(set3p1), parseInt(set3p2)]
+          : [null, null];
+
+        // 验证比分
+        let p1Sets = 0, p2Sets = 0;
+        if (set1[0] > set1[1]) p1Sets++; else p2Sets++;
+        if (set2[0] > set2[1]) p1Sets++; else p2Sets++;
+
+        if (p1Sets === 1 && p2Sets === 1) {
+          // 需要第三盘
+          if (set3[0] === null || set3[1] === null) {
+            alert('1:1 平局需要第三盘抢十的比分！');
+            return;
+          }
+          if (set3[0] < 10 && set3[1] < 10) {
+            alert('抢十比分至少有一方要达到 10 分！');
+            return;
+          }
+        } else if (set3[0] !== null) {
+          alert('已经 2:0 决出胜负，不需要第三盘！');
+          return;
+        }
+
+        await addMatch(player1Id, player2Id, [set1, set2, set3]);
+        
+        // 清空表单
+        e.target.reset();
+      });
+    }
+
+    // 启动
+    init();
+  </script>
+</body>
+</html>
+
