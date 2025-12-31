@@ -748,16 +748,21 @@
         sets.forEach((set, idx) => {
           if (set[0] === null || set[1] === null) return;
           
-          p1Games += set[0];
-          p2Games += set[1];
-
           // 判断这盘谁赢
           if (idx === 2) {
-            // 第三盘抢十
-            if (set[0] >= 10 && set[0] > set[1]) p1Sets++;
-            else if (set[1] >= 10 && set[1] > set[0]) p2Sets++;
+            // 第三盘抢十 - 只计算1局给胜者
+            if (set[0] >= 10 && set[0] > set[1]) {
+              p1Sets++;
+              p1Games += 1;  // 抢十胜者得1局
+            } else if (set[1] >= 10 && set[1] > set[0]) {
+              p2Sets++;
+              p2Games += 1;  // 抢十胜者得1局
+            }
           } else {
-            // 普通盘
+            // 普通盘 - 正常计算局数
+            p1Games += set[0];
+            p2Games += set[1];
+            
             if (set[0] > set[1]) p1Sets++;
             else if (set[1] > set[0]) p2Sets++;
           }
