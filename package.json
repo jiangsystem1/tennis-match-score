@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "node build.js"
+    "build": "node build.js",
+    "seed": "node seed-news.js --seed",
+    "check": "node seed-news.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
   }
 }
