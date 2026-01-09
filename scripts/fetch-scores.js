@@ -105,20 +105,21 @@ function buildPrompt() {
     day: 'numeric'
   });
 
-  return `Search for CURRENT tennis match results and live scores from today ${today}. 
-Include these tournaments if active: ${tournaments}.
+  return `Search the web for tennis match results from today ${today}.
 
-Give me specific player names and scores. Format the response like this:
+Tournaments: ${tournaments}
 
+RULES:
+- Start your response with "## 🏆" immediately
+- NO introduction like "Here are the results" or "It is January..."
+- NO explanation, just the formatted scores
+
+FORMAT:
 ## 🏆 Tournament Name
-
-### Country/Player A vs Country/Player B (for team events)
 - Player1 def. Player2: 6-4, 6-3 ✓
 - Player3 vs Player4: 6-2, 3-1 🔴 LIVE
-- Player5 vs Player6: Scheduled
 
-Use ✓ for completed matches, 🔴 LIVE for in-progress matches.
-Keep the response concise and focused on actual scores.`;
+Use ✓ for completed, 🔴 LIVE for in-progress.`;
 }
 
 // Query Gemini API with search grounding
@@ -149,12 +150,25 @@ async function queryGemini(prompt) {
   return data.candidates[0].content.parts[0].text;
 }
 
+// Clean up Gemini response - remove any preamble before first ##
+function cleanupContent(content) {
+  // Find the first ## and remove everything before it
+  const firstHeader = content.indexOf('## ');
+  if (firstHeader > 0) {
+    content = content.substring(firstHeader);
+  }
+  return content.trim();
+}
+
 // Save to Supabase
 async function saveToSupabase(content) {
+  // Clean up the content before saving
+  const cleanContent = cleanupContent(content);
+
   const { data, error } = await supabase
     .from('score_snapshots')
     .insert([{
-      content: content,
+      content: cleanContent,
       fetched_at: new Date().toISOString()
     }])
     .select();
