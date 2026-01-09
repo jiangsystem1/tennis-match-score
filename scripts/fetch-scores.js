@@ -126,6 +126,11 @@ Use ✓ for completed, 🔴 LIVE for in-progress.`;
 async function queryGemini(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
+  console.log('🌐 Making request to Gemini API...');
+  console.log('📍 URL:', url.replace(GEMINI_API_KEY, '***API_KEY***'));
+
+  const startTime = Date.now();
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -137,17 +142,42 @@ async function queryGemini(prompt) {
     })
   });
 
+  const elapsed = Date.now() - startTime;
+
+  console.log('📊 Response status:', response.status, response.statusText);
+  console.log('⏱️ Response time:', elapsed, 'ms');
+
   if (!response.ok) {
+    const errorBody = await response.text();
+    console.error('❌ Error response body:', errorBody);
     throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();
 
+  console.log('📦 Response structure:', {
+    hasCandidates: !!data.candidates,
+    candidatesCount: data.candidates?.length || 0,
+    hasContent: !!data.candidates?.[0]?.content,
+    partsCount: data.candidates?.[0]?.content?.parts?.length || 0,
+    finishReason: data.candidates?.[0]?.finishReason || 'unknown'
+  });
+
   if (!data.candidates || !data.candidates[0]) {
+    console.error('❌ Full response:', JSON.stringify(data, null, 2));
     throw new Error('No response from Gemini');
   }
 
-  return data.candidates[0].content.parts[0].text;
+  const textContent = data.candidates[0].content?.parts?.[0]?.text;
+
+  if (!textContent) {
+    console.error('❌ No text in response. Parts:', JSON.stringify(data.candidates[0].content?.parts, null, 2));
+    throw new Error('No text content in Gemini response');
+  }
+
+  console.log('✅ Got text response, length:', textContent.length, 'characters');
+
+  return textContent;
 }
 
 // Clean up Gemini response - remove any preamble before first ##
@@ -160,15 +190,40 @@ function cleanupContent(content) {
   return content.trim();
 }
 
+// Validate content has actual tennis scores
+function isValidContent(content) {
+  if (!content || content.trim().length === 0) {
+    return false;
+  }
+
+  // Must have at least one tournament header (## 🏆)
+  if (!content.includes('## ')) {
+    return false;
+  }
+
+  // Must have at least one match result (contains "def." or "vs" or score pattern)
+  const hasMatch = content.includes(' def. ') ||
+    content.includes(' vs ') ||
+    /\d+-\d+/.test(content); // Score pattern like 6-4
+
+  if (!hasMatch) {
+    return false;
+  }
+
+  // Content should be at least 100 characters (rough check for meaningful content)
+  if (content.length < 100) {
+    return false;
+  }
+
+  return true;
+}
+
 // Save to Supabase
 async function saveToSupabase(content) {
-  // Clean up the content before saving
-  const cleanContent = cleanupContent(content);
-
   const { data, error } = await supabase
     .from('score_snapshots')
     .insert([{
-      content: cleanContent,
+      content: content,
       fetched_at: new Date().toISOString()
     }])
     .select();
@@ -217,9 +272,19 @@ async function main() {
     console.log(content.substring(0, 500) + '...\n');
     console.log('---\n');
 
+    // Clean and validate content
+    const cleanContent = cleanupContent(content);
+
+    if (!isValidContent(cleanContent)) {
+      console.log('⚠️ No valid tennis scores in response. Skipping save.');
+      console.log('📝 Raw content length:', content.length);
+      console.log('📝 Clean content length:', cleanContent.length);
+      process.exit(0); // Exit successfully but don't save
+    }
+
     // Save to Supabase
     console.log('💾 Saving to Supabase...');
-    const record = await saveToSupabase(content);
+    const record = await saveToSupabase(cleanContent);
     console.log('✅ Saved! Record ID:', record.id);
 
     // Cleanup old records
